@@ -17,16 +17,21 @@ namespace LB6
             var doc = await context.OpenAsync(url);
             var aList = doc.QuerySelectorAll("div.product-preview__title a").Select(elem => doc.Origin + elem.GetAttribute("href"));
             Notebook nb;
-            Brand bb;
             IElement value;
             foreach ( var a in aList )
             {
                 Console.WriteLine(a);
                 doc = await context.OpenAsync(a);
                 nb = new Notebook();
-                bb = new Brand();
                 value = doc.QuerySelector("div.product__area-title > h1.product__title");
                 nb.Name = value.TextContent;
+                using (var db = new MigrationsContext())
+                {
+                    if (db.Notebook.Any(x => x.Name == nb.Name))
+                    {
+                        break;
+                    }
+                }
                 nb.Id = Guid.NewGuid();
                 foreach (var prop in doc.QuerySelectorAll("div#tab-characteristics div.property")
                     .Select(prop => new KeyValuePair<string, string>(prop.QuerySelector("div.property__name").TextContent, prop.QuerySelector("div.property__content").TextContent)))
@@ -48,7 +53,10 @@ namespace LB6
                                 string brand = ClearValue(prop.Value).ToString();
                                 if (db.Brand.Count() == 0)
                                 {
+                                    Brand bb = new Brand();
                                     bb.Name = brand;
+                                    db.Brand.Add(bb);
+                                    db.SaveChanges();
                                 }
                                 if (db.Brand.Any(b => b.Name == brand))
                                 {
@@ -66,7 +74,6 @@ namespace LB6
                 }
                 using (var db = new MigrationsContext())
                 {
-                    db.Brand.Add(bb);
                     db.Notebook.Add(nb);
                     db.SaveChanges();
                 }

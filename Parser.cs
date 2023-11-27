@@ -16,31 +16,60 @@ namespace LB6
             var context = BrowsingContext.New(Configuration.Default.WithDefaultLoader());
             var doc = await context.OpenAsync(url);
             var aList = doc.QuerySelectorAll("div.product-preview__title a").Select(elem => doc.Origin + elem.GetAttribute("href"));
-            NoteBook nb;
+            Notebook nb;
+            Brand bb;
             IElement value;
             foreach ( var a in aList )
             {
                 Console.WriteLine(a);
                 doc = await context.OpenAsync(a);
-                nb = new NoteBook();
-                nb.Id = Guid.NewGuid();
+                nb = new Notebook();
+                bb = new Brand();
                 value = doc.QuerySelector("div.product__area-title > h1.product__title");
                 nb.Name = value.TextContent;
+                nb.Id = Guid.NewGuid();
                 foreach (var prop in doc.QuerySelectorAll("div#tab-characteristics div.property")
                     .Select(prop => new KeyValuePair<string, string>(prop.QuerySelector("div.property__name").TextContent, prop.QuerySelector("div.property__content").TextContent)))
                 {
-                    if (prop.Key == "Бренд")
-                        nb.Brand = ClearValue(prop.Value);
-                    else if (prop.Key.Contains("Частота обновления экрана"))
-                        nb.Frequency = ClearValue(prop.Value);
-                    else if (prop.Key.Contains("Разрешение экрана"))
-                        nb.Resolution = ClearValue(prop.Value);
-                    else if (prop.Key.Contains("Вес"))
-                        nb.Weight = ClearValue(prop.Value);
+                    switch (prop.Key)
+                    {
+                        case "Частота обновления экрана":
+                            nb.Frequency = ClearValue(prop.Value);
+                            break;
+                        case "Разрешение экрана":
+                            nb.Resolution = ClearValue(prop.Value);
+                            break;
+                        case "Вес":
+                            nb.Weight = ClearValue(prop.Value);
+                            break;
+                        case "Бренд":
+                            using (var db = new MigrationsContext())
+                            {
+                                string brand = ClearValue(prop.Value).ToString();
+                                if (db.Brand.Count() == 0)
+                                {
+                                    bb.Name = brand;
+                                }
+                                if (db.Brand.Any(b => b.Name == brand))
+                                {
+                                    foreach (var b in db.Brand)
+                                    {
+                                        if (b.Name == brand)
+                                        {
+                                            nb.BrandID = b.BrandID;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
                 }
-                SiteParseEntities db = new SiteParseEntities();
-                db.NoteBook.Add(nb);
-                db.SaveChanges();
+                using (var db = new MigrationsContext())
+                {
+                    db.Brand.Add(bb);
+                    db.Notebook.Add(nb);
+                    db.SaveChanges();
+                }
             }
         }
         private static string ClearValue(string value)
